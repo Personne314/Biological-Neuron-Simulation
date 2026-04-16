@@ -1,9 +1,7 @@
 #pragma once
 
 #include <vector>
-#include <random>
 #include <cmath>
-#include <numbers>
 #include <glm/glm.hpp>
 #include <glm/ext/vector_float3.hpp>
 
