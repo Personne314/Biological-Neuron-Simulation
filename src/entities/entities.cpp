@@ -6,9 +6,6 @@
 
 
 
-namespace chroma::ecs
-{
-
 /**
  * @brief Make a new entity and return its id.
  * @return The id of the entity.
@@ -50,6 +47,4 @@ bool Entities::check(Entity entity) const
 {
 	const uint32_t id = entity.ID();
 	return (id < m_entity_counter) && (m_versions[id] == entity.version());
-}
-
 }

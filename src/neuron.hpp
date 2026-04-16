@@ -55,7 +55,7 @@ inline bool step_neuron(float &v, float &u, float I)
  */
 namespace NeuronModelType
 {
-	enum Enum
+	enum Enum : uint8_t
 	{
 		// Cortex
 		CortexPyramidalCell,

@@ -7,9 +7,6 @@
 
 
 
-namespace chroma::ecs
-{
-
 /**
  * @brief Return a new unique id upon each call.
  * @return The uint32_t id.
@@ -135,5 +132,3 @@ private:
 	uint32_t m_size{0};					// Number of entities in this component.
 
 };
-
-}

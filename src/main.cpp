@@ -2,23 +2,24 @@
 #include <SDL2/SDL.h>
 #include <vector>
 #include <cmath>
-#include <numbers>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-#include "entities/neuron_systems.hpp"
+#include "network/topology/microcolumn.h"
+#include "network/topology/structs.hpp"
 #include "neuron.hpp"
 #include "utils/logger.hpp"
 #include "render/structs.hpp"
 #include "render/camera.h"
 #include "render/engine.h"
-#include "entities/neuron_entities.hpp"
+#include "network/topology/render_systems.hpp"
 #include "utils/octree.hpp"
 
 
 
 int main(int argc, char* argv[])
 {
+	(void)argc; (void)argv;
 	if (SDL_Init(SDL_INIT_VIDEO) < 0) return -1;
 	
 	SDL_Window* window = SDL_CreateWindow("Chroma BioSim", 
@@ -31,132 +32,77 @@ int main(int argc, char* argv[])
 	glewInit();
 	glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
 	glEnable(GL_DEPTH_TEST);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	init_logger();
 
 	RenderEngine engine("cell.vert", "cell.frag", "line.vert", "line.frag");
 
-
-
-
-
-	// Initialisation ECS et Octree
-	chroma::ecs::Entities entities;
+	Entities entities;
 	Box world_bounds = {-10000.0f, -10000.0f, -10000.0f, 10000.0f, 10000.0f, 10000.0f};
-	Octree<OctreeElement> octree(world_bounds);
+	Octree<OctreeEntity> octree(world_bounds);
 
-	// Remplace ceci par la liste exhaustive de ton enum NeuronModelType
-	std::vector<NeuronModelType::Enum> neuron_types = {
+	std::vector<Sphere> render_somas;
+	std::vector<Point> render_axons;
+	std::vector<Point> render_dendrites;
+	std::vector<Point> render_synapses;
+	std::vector<Point> all_lines;
 
-		NeuronModelType::CortexPyramidalCell,
-		NeuronModelType::CortexSpinyStellateCell,
-		NeuronModelType::CortexLayer5PyramidalCell,
-		NeuronModelType::CortexChatteringCell,
-		NeuronModelType::CortexBasketCell,
-		NeuronModelType::CortexNonBasketCell,
-		NeuronModelType::CortexMartinottiCell,
-		NeuronModelType::CortexLayer1NonBasketCell,
+	SomaRenderSystem soma_sys(render_somas);
+	AxonRenderSystem axon_sys(entities, render_axons);
+	DendriteRenderSystem dendrite_sys(entities, render_dendrites);
+	SynapseRenderSystem synapse_sys(entities, render_synapses, true);
 
-		// Thalamus
-		NeuronModelType::ThalamusThalamocorticalRelay,
-		NeuronModelType::ThalamusReticularNucleusNeuron,
-		NeuronModelType::ThalamusTIn_FS,
-		NeuronModelType::ThalamusTIn_LTS,
-
-		// Hippocampus
-		NeuronModelType::HippocampusCA3PyramidalCell,
-		NeuronModelType::HippocampusCA1PyramidalCell,
-		NeuronModelType::HippocampusGranuleCell,
-		NeuronModelType::HippocampusBasketCell,
-		NeuronModelType::HippocampusOLMCell,
-
-		// Basal Ganglia
-		NeuronModelType::BasalGangliaMediumSpinyNeuron,
-		NeuronModelType::BasalGangliaStriatalFastSpiking,
-		NeuronModelType::BasalGangliaPallidalNeuron,
-
-		// Brainstem
-		NeuronModelType::BrainstemDopaminergicNeuron,
-		NeuronModelType::BrainstemCholinergicNeuron,
-		NeuronModelType::BrainstemMesencephalicNeuron,
-
-		// Cerebellum
-		NeuronModelType::CerebellumPurkinjeCell,
-		NeuronModelType::CerebellumGranuleCell,
-		NeuronModelType::CerebellumGolgiCell,
-		NeuronModelType::CerebellumStellateCell,
-
-		// Spinal Cord
-		NeuronModelType::SpinalCordAlphaMotorNeuron,
-		NeuronModelType::SpinalCordGammaMotorNeuron,
-		NeuronModelType::SpinalCordRenshawCell,
-
-		// Amygdala
-		NeuronModelType::AmygdalaBasolateralPyramidal,
-		NeuronModelType::AmygdalaCentralNucleusNeuron,
-
-		// Olfactory Bulb
-		NeuronModelType::OlfactoryBulbMitralCell,
-		NeuronModelType::OlfactoryBulbTuftedCell,
-		NeuronModelType::OlfactoryBulbPeriglomerularCell
-	};
+	// ===== GENERATION DE LA MICROCOLONNE =====
 	
-	int num_somas = neuron_types.size();
-	std::vector<Sphere> cells(num_somas);
-	SomaRenderSystem soma_render_system(cells);
+	MicroColumnDescriptor desc;
+	desc.radius = 30.0f;
+	desc.height = 2000.0f;
+	desc.position = glm::vec3(0.0f, -1000.0f, 0.0f); // Centré sur l'axe Y
+	desc.direction = glm::vec3(0.0f, 1.0f, 0.0f);
 	
-	float spacing = 75.0f;
-	float radius = 0.0f;
-	
-	if (num_somas > 1)
-		radius = spacing / (2.0f * std::sin(std::numbers::pi_v<float> / num_somas));
+	float bounds[6] = {0.1f, 0.25f, 0.4f, 0.7f, 0.9f, 1.0f};
+	std::copy(std::begin(bounds), std::end(bounds), desc.layer_boundaries);
 
-	// Placement en cercle
-	for (int i = 0; i < num_somas; ++i) {
-		float angle = i * (2.0f * std::numbers::pi_v<float> / num_somas);
-		
-		Position pos = {
-			radius * std::cos(angle),
-			0.0f, // Cercle sur le plan XZ
-			radius * std::sin(angle)
-		};
-		
-		Soma soma = {0, neuron_types[i]}; // axon = 0 (entité nulle au départ)
-		
-		// 1. Enregistrement dans l'ECS et l'Octree
-		make_soma_entity(entities, octree, soma, pos);
+	std::vector<LayerRecipe> column_recipes[6];
+	column_recipes[0].push_back({5, NeuronModelType::CortexLayer1NonBasketCell});
+	column_recipes[1].push_back({20, NeuronModelType::CortexPyramidalCell});
+	column_recipes[1].push_back({5, NeuronModelType::CortexBasketCell});
+	column_recipes[2].push_back({25, NeuronModelType::CortexPyramidalCell});
+	column_recipes[2].push_back({5, NeuronModelType::CortexChatteringCell});
+	column_recipes[3].push_back({30, NeuronModelType::CortexSpinyStellateCell});
+	column_recipes[4].push_back({15, NeuronModelType::CortexLayer5PyramidalCell});
+	column_recipes[4].push_back({5, NeuronModelType::CortexMartinottiCell});
+	column_recipes[5].push_back({15, NeuronModelType::CortexPyramidalCell});
 
-	}
+	build_microcolumn(entities, octree, desc, column_recipes);
 
 	Camera camera;
 	bool running = true;
 	bool mousePressed = false;
 
-	std::vector<Point> lines;
-
 	while (running) {
 		SDL_Event e;
 		while (SDL_PollEvent(&e)) {
 			if (e.type == SDL_QUIT) running = false;
-			if (e.type == SDL_MOUSEWHEEL) camera.zoom((float)e.wheel.y);
+			if (e.type == SDL_MOUSEWHEEL) camera.zoom(10.0f * e.wheel.y);
 			if (e.type == SDL_MOUSEBUTTONDOWN && e.button.button == SDL_BUTTON_LEFT) mousePressed = true;
 			if (e.type == SDL_MOUSEBUTTONUP && e.button.button == SDL_BUTTON_LEFT) mousePressed = false;
 			if (e.type == SDL_MOUSEMOTION && mousePressed) camera.rotate((float)e.motion.xrel, (float)e.motion.yrel);
 		}
 
-		lines.clear();
-		for (size_t i = 0; i < cells.size(); ++i) {
-			size_t next_i = (i + 1) % cells.size();
-			glm::vec4 color = cells[i].color;
-			
-			// Point de départ (utilise la couleur de la sphère de départ)
-			lines.push_back({glm::vec3(cells[i].pos_rad.x, cells[i].pos_rad.y, cells[i].pos_rad.z), color});
-			// Point d'arrivée
-			lines.push_back({glm::vec3(cells[next_i].pos_rad.x, cells[next_i].pos_rad.y, cells[next_i].pos_rad.z), color});
-		}
+		soma_sys.update(entities, 0.0f);
+		axon_sys.update(entities, 0.0f);
+		dendrite_sys.update(entities, 0.0f);
+		synapse_sys.update(entities, 0.0f);
 
-		soma_render_system.update(entities, 0);
-		engine.update_spheres(cells);
-		engine.update_lines(lines);
+		all_lines.clear();
+		all_lines.insert(all_lines.end(), render_axons.begin(), render_axons.end());
+		all_lines.insert(all_lines.end(), render_dendrites.begin(), render_dendrites.end());
+		all_lines.insert(all_lines.end(), render_synapses.begin(), render_synapses.end());
+
+		engine.update_spheres(render_somas);
+		engine.update_lines(all_lines);
 
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -170,5 +116,4 @@ int main(int argc, char* argv[])
 	SDL_DestroyWindow(window);
 	SDL_Quit();
 	return 0;
-
 }

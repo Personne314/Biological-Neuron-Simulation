@@ -4,9 +4,6 @@
 
 
 
-namespace chroma::ecs
-{
-
 /**
  * @struct Entity
  * @brief uint32_t with some methods for entity id bit-packing.
@@ -31,5 +28,3 @@ struct Entity
 	bool operator!=(const Entity& other) const { return id != other.id; }
 	
 };
-
-}

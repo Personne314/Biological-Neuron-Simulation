@@ -7,9 +7,6 @@
 
 
 
-namespace chroma::ecs
-{
-
 /**
  * @interface ISystem
  * @brief Used for System storage through ISystem*.
@@ -47,5 +44,3 @@ public:
 	}
 
 };
-
-}

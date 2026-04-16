@@ -11,9 +11,6 @@
 
 
 
-namespace chroma::ecs
-{
-
 template<typename T_Parent, typename... T_Components>
 class System;
 
@@ -57,7 +54,7 @@ public:
 	{
 		get_component<T>()->remove(entity);
 		const uint32_t id = entity.ID();
-        if (id < m_signatures.size()) m_signatures[id].reset(gen_component_id<T>());
+		if (id < m_signatures.size()) m_signatures[id].reset(gen_component_id<T>());
 	}
 
 	/**
@@ -77,10 +74,10 @@ public:
 	 * @return A reference to the component data. 
 	 */
 	template <typename T>
-    T &get_component(Entity entity)
-    {
-        return get_component<T>().get(entity);
-    }
+	T &get_component(Entity entity)
+	{
+		return get_component<T>().get(entity);
+	}
 	
 	bool check(Entity entity) const;
 
@@ -110,12 +107,12 @@ private:
 	 * @return A pointer to the internal Component<T> storage, or nullptr.
 	 */
 	template <typename T>
-    Component<T> *get_component_ptr() 
-    {
-        uint32_t id = gen_component_id<T>();
-        if (id >= m_components.size() || !m_components[id]) return nullptr;
-        return static_cast<Component<T>*>(m_components[id].get());
-    }
+	Component<T> *get_component_ptr() 
+	{
+		uint32_t id = gen_component_id<T>();
+		if (id >= m_components.size() || !m_components[id]) return nullptr;
+		return static_cast<Component<T>*>(m_components[id].get());
+	}
 
 	/**
 	 * @brief Execute a system process method on matching entities.
@@ -124,17 +121,17 @@ private:
 	 * @tparam Args Variadic types for additional arguments.
 	 * @param sys The system instance invoking the update.
 	 * @param args Arguments to forward to the sys.process() method.
-     */
+	 */
 	template <typename... Components, typename SystemInstance, typename... Args>
 	void run_system(SystemInstance &sys, Args &&...args) 
 	{
 		if (sizeof...(Components) == 0) return;
 		std::bitset<64> system_signature;
-        (system_signature.set(gen_component_id<Components>()), ...);
+		(system_signature.set(gen_component_id<Components>()), ...);
 
 		// Get the smaller entity vector.
 		const std::vector<Entity>* best_entities_vector = nullptr;
-    	size_t min_size = std::numeric_limits<size_t>::max();
+		size_t min_size = std::numeric_limits<size_t>::max();
 		auto consider_as_leader = [&](auto* component) {
 			size_t size = (component) ? component->size() : 0;
 			if (size < min_size) {
@@ -153,12 +150,10 @@ private:
 		}
 	}
 
-	std::vector<std::unique_ptr<IComponent>> m_components{};	// List of all existing components.
-	std::vector<std::bitset<64>> m_signatures{};	// Masks for components checking.
-	std::vector<Entity> m_free_ids{};	// List of all free entity ids.
-	std::vector<uint16_t> m_versions{};	// List of all ids versions.
-	uint32_t m_entity_counter{0};		// Counter to generate new entity ids.
+	std::vector<std::unique_ptr<IComponent>> m_components{}; // List of all existing components.
+	std::vector<std::bitset<64>> m_signatures{}; // Masks for components checking.
+	std::vector<Entity> m_free_ids{};   // List of all free entity ids.
+	std::vector<uint16_t> m_versions{}; // List of all ids versions.
+	uint32_t m_entity_counter{0};       // Counter to generate new entity ids.
 
 };
-
-}
