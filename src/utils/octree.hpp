@@ -152,7 +152,6 @@ public:
 	/**
 	 * @brief Remove an element from the tree if the predicate is true.
 	 * @param pred The predicate to find the element to remove.
-	 * @return true if there was an error.
 	 */
 	template<typename Pred>
 	void remove_if_global(Pred pred)
@@ -322,148 +321,153 @@ private:
 		
 	}
 
-
-
-
-
-
-
-
-
-
-
-
-
-
+	/**
+	 * @brief Recursive function to remove an element according to a predicate.
+	 * @param node The node to start the recursion from.
+	 * @param pred The predicate used to identify the element.
+	 * @param x x coordinate to go down in the tree.
+	 * @param y y coordinate to go down in the tree.
+	 * @param z z coordinate to go down in the tree.
+	 * @return true if there was an error.
+	 */
 	template<typename Pred>
-	bool remove_if_recursive(Node* node, Pred pred, float x, float y, float z) {
+	bool remove_if_recursive(Node *node, Pred pred, float x, float y, float z)
+	{
+
+		// If we are in a leaf, try to find the element and remove it.
 		if (node->leaf()) {
-			// Utilisation d'un itérateur inverse pour suppression efficace ou find_if
 			auto it = std::find_if(node->items.begin(), node->items.end(), pred);
 			if (it != node->items.end()) {
-				// Swap & Pop (O(1)) : on remplace par le dernier et on réduit la taille
 				*it = std::move(node->items.back());
 				node->items.pop_back();
-				return true;
+				return false;
 			}
-			return false;
+			return true;
 		}
 
-		// Descente
-		int32_t idx = child_index(node->bounds, x, y, z);
-		bool removed = remove_if_recursive(node->children[idx].get(), pred, x, y, z);
-
-		if (removed) {
-			// Logique de fusion (Collapse)
-			// On vérifie si on peut transformer cette branche en feuille
-			int32_t totalCount = 0;
-			for (const auto& child : node->children) {
-				if (!child->isLeaf()) return true; // Si un enfant est une branche, on ne peut pas fusionner
-				totalCount += child->items.size();
-			}
-
-			if (totalCount <= m_cap) {
-				// Fusion !
-				node->items.reserve(totalCount);
-				for (auto& child : node->children) {
-					// Move iterator pour transfert efficace
-					node->items.insert(node->items.end(), 
-									std::make_move_iterator(child->items.begin()), 
-									std::make_move_iterator(child->items.end()));
-					child.reset(); // Destruction du nœud enfant
-				}
-			}
+		// Else go down into the tree to remove it recursively.
+		int32_t id = child_index(node->bounds, x, y, z);
+		bool removed = remove_if_recursive(node->children[id].get(), pred, x, y, z);
+		if (!removed) return true;
+		
+		// Collate logic to merge the node into a leaf if needed.
+		int32_t count = 0;
+		for (const auto &child : node->children) {
+			if (!child->isLeaf()) return false;
+			count += child->items.size();
 		}
-		return removed;
+
+		// If there is not too much children, merge them.
+		if (count > m_cap) return false;
+		node->items.reserve(count);
+		for (auto &child : node->children) {
+			node->items.insert(
+				node->items.end(), 
+				std::make_move_iterator(child->items.begin()), 
+				std::make_move_iterator(child->items.end())
+			);
+			child.reset();
+		}
+		return false;
 	}
 
-
-
-
-
-
-
+	/**
+	 * @brief Recursive function to remove an element according to a predicate.
+	 * @param node The node to start the recursion from.
+	 * @param pred The predicate used to identify the element.
+	 */
 	template<typename Pred>
-	void remove_if_global_recursive(Node* node, Pred pred) {
+	void remove_if_global_recursive(Node* node, Pred pred)
+	{
+		// Remove the element if we are in a leaf or go down into the tree.
 		if (node->leaf()) {
-			// C++20 erase_if : propre et efficace
 			std::erase_if(node->items, pred);
-		} else {
-			bool allEmptyLeaves = true;
-			int32_t totalCount = 0;
+			return;
+		}
+		
+		// Try a recursive deletion on each children.
+		bool all_empty = true;
+		int32_t count = 0;
+		for (auto &child : node->children) {
+			remove_if_global_recursive(child.get(), pred);
+			if (!child->isLeaf()) all_empty = false;
+			count += child->items.size();
+		}
+
+		// Try to merge after the deletion.
+		if (all_empty && count > m_cap) return;
+		node->items.reserve(count);
+		for (auto& child : node->children) {
+			node->items.insert(
+				node->items.end(), 
+				std::make_move_iterator(child->items.begin()), 
+				std::make_move_iterator(child->items.end())
+			);
+			child.reset();
+		}
 			
-			for (auto& child : node->children) {
-				remove_if_global_recursive(child.get(), pred);
-				if (!child->isLeaf()) allEmptyLeaves = false;
-				totalCount += child->items.size();
-			}
-
-			// Tentative de fusion après nettoyage global
-			if (allEmptyLeaves && totalCount <= m_cap) {
-				node->items.reserve(totalCount);
-				for (auto& child : node->children) {
-					node->items.insert(node->items.end(), 
-									std::make_move_iterator(child->items.begin()), 
-									std::make_move_iterator(child->items.end()));
-					child.reset();
-				}
-			}
-		}
 	}
 
+	/**
+	 * @brief Recursive query all elements in a given sphere.
+	 * @param node The node to start the search from.
+	 * @param x The x coordinate of the sphere.
+	 * @param y The y coordinate of the sphere.
+	 * @param z The z coordinate of the sphere.
+	 * @param radius2 The radius squared of the sphere.
+	 * @param out A reference to a vector where to store the found elements.
+	 */
+	void query_radius_recursive(const Node *node, float x, float y, float z, float radius2, std::vector<T> &out) const
+	{
+		// Check if the sphere is in the node.
+		if (node->bounds.dist2(x, y, z) > radius2) return;
 
-
-
-
-
-
-
-
-
-	void query_radius_recursive(const Node* node, float x, float y, float z, float radiusSq, std::vector<T>& out) const {
-		// Broad Phase : Test Boîte vs Sphère
-		// distanceSqToPoint est très rapide et élimine les branches éloignées
-		if (node->bounds.dist2(x, y, z) > radiusSq) return;
-
+		// Check all elements if we are in a leaf.
 		if (node->leaf()) {
-			// Narrow Phase : Test précis Point vs Sphère
-			for (const auto& item : node->items) {
-				float dx = item.x - x;
-				float dy = item.y - y;
-				float dz = item.z - z;
-				if (dx*dx + dy*dy + dz*dz <= radiusSq) {
-					out.push_back(item);
-				}
+			for (const auto &item : node->items) {
+				const float dx = item.x - x;
+				const float dy = item.y - y;
+				const float dz = item.z - z;
+				if (dx*dx + dy*dy + dz*dz > radius2) continue;
+				out.push_back(item);
 			}
+
+		// Recursive search.
 		} else {
-			// Pas d'ordre spécifique pour les enfants, une sphère peut en chevaucher plusieurs
-			for (const auto& child : node->children) {
-				query_radius_recursive(child.get(), x, y, z, radiusSq, out);
+			for (const auto &child : node->children) {
+				query_radius_recursive(child.get(), x, y, z, radius2, out);
 			}
 		}
+
 	}
 
+	/**
+	 * @brief Recursive query all elements in a given box.
+	 * @param node The node to start the search from.
+	 * @param box The box to get the elements from.
+	 * @param out A reference to a vector where to store the found elements.
+	 */
+	void query_box_recursive(const Node *node, const Box &box, std::vector<T> &out) const
+	{
+		// Check if the box is in the node.
+		if (node->bounds.min_x > box.max_x || node->bounds.max_x < box.min_x ||
+			node->bounds.min_y > box.max_y || node->bounds.max_y < box.min_y ||
+			node->bounds.min_z > box.max_z || node->bounds.max_z < box.min_z) return;
 
-
-
-	
-	void query_box_recursive(const Node* node, const Box& searchBox, std::vector<T>& out) const {
-		// Intersection simple AABB vs AABB
-		if (node->bounds.min_x > searchBox.max_x || node->bounds.max_x < searchBox.min_x ||
-			node->bounds.min_y > searchBox.max_y || node->bounds.max_y < searchBox.min_y ||
-			node->bounds.min_z > searchBox.max_z || node->bounds.max_z < searchBox.min_z) return;
-
+		// Check all elements if we are in a leaf.
 		if (node->leaf()) {
-			for (const auto& item : node->items) {
-				if (searchBox.contains(item.x, item.y, item.z)) {
-					out.push_back(item);
-				}
+			for (const auto &item : node->items) {
+				if (!box.contains(item.x, item.y, item.z)) continue;
+				out.push_back(item);
 			}
+
+		// Recursive search.
 		} else {
-			for (const auto& child : node->children) {
-				query_box_recursive(child.get(), searchBox, out);
+			for (const auto &child : node->children) {
+				query_box_recursive(child.get(), box, out);
 			}
 		}
+
 	}
 
 };
