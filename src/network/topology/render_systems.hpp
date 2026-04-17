@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <vector>
 #include <glm/vec4.hpp>
 
@@ -9,127 +10,227 @@
 
 
 
+/**
+ * @class SomaRenderSystem
+ * @brief System used to render the somas.
+ */
 class SomaRenderSystem : public System<SomaRenderSystem, Soma, Position>
 {
 public:
-	std::vector<Sphere>& render_soma;
 
-	SomaRenderSystem(std::vector<Sphere>& cells) : render_soma(cells) {}
+	/**
+	 * @brief Construct a soma render system linked to a given vector.
+	 * @param cells The vector where to store the generated data.
+	 */
+	SomaRenderSystem(std::vector<Sphere> &cells) : 
+		m_soma(cells)
+	{}
 
-	void update(Entities& entities, float dt) override
+	/**
+	 * @brief Update function to call in order to generate all spheres.
+	 * @param entities The entities to render.
+	 * @param dt Unused.
+	 */
+	void update(Entities &entities, float dt = 0) override
 	{
-		render_soma.clear();
 		System<SomaRenderSystem, Soma, Position>::update(entities, dt);
 	}
 
-	void process([[maybe_unused]] Entity entity, Soma& soma, Position& pos, [[maybe_unused]] float dt)
+	/**
+	 * @brief Process one entity to generate its sphere.
+	 * @param entity Unused.
+	 * @param soma The entity soma.
+	 * @param pos The entity position in space.
+	 * @param dt Unused.
+	 */
+	void process([[maybe_unused]] Entity entity, Soma &soma, Position &pos, [[maybe_unused]] float dt)
 	{
 		Sphere sph;
 		sph.pos_rad = glm::vec4(pos.x, pos.y, pos.z, SomaDiameters[soma.type]);
 		sph.color = NeuronColors[soma.type];
-		render_soma.push_back(sph);
+		m_soma.push_back(sph);
 	}
+
+private:
+
+	std::vector<Sphere> &m_soma; // A reference to the vector where to store the soma spheres.
+
 };
 
 
 
+/**
+ * @class AxonRenderSystem
+ * @brief System used to render the axons.
+ */
 class AxonRenderSystem : public System<AxonRenderSystem, Axon, Position>
 {
 public:
-	std::vector<Point>& render_lines;
-	Entities* entities_ptr;
 
-	AxonRenderSystem(Entities& ents, std::vector<Point>& lines) : render_lines(lines), entities_ptr(&ents) {}
+	/**
+	 * @brief Construct an axon render system linked to a given vector.
+	 * @param entities The entities to use in process in order to get extra data.
+	 * @param lines The vector where to store the generated data.
+	 */
+	AxonRenderSystem(Entities &entities, std::vector<Point> &lines) : 
+		m_lines(lines), m_entities(&entities)
+	{}
 
-	void update(Entities& entities, float dt) override
+	/**
+	 * @brief Update function to call in order to generate all lines.
+	 * @param entities The entities to render.
+	 * @param dt Unused.
+	 */
+	void update(Entities &entities, float dt = 0) override
 	{
-		render_lines.clear();
 		System<AxonRenderSystem, Axon, Position>::update(entities, dt);
 	}
 
-	void process([[maybe_unused]] Entity entity, Axon& axon, Position& pos, [[maybe_unused]] float dt)
+	/**
+	 * @brief Process one entity to generate its line.
+	 * @param entity Unused.
+	 * @param axon The entity axon.
+	 * @param pos The entity position in space.
+	 * @param dt Unused.
+	 */
+	void process([[maybe_unused]] Entity entity, Axon &axon, Position &pos, [[maybe_unused]] float dt)
 	{
-		if (!entities_ptr->has_component<Position>(axon.parent)) return;
-
-		auto& parent_pos = entities_ptr->get_component<Position>(axon.parent);
-		glm::vec4 color = NeuronColors[axon.type]; // On a le type directement sous la main grace a ta duplication !
-
-		render_lines.push_back({glm::vec3(parent_pos.x, parent_pos.y, parent_pos.z), color});
-		render_lines.push_back({glm::vec3(pos.x, pos.y, pos.z), color});
+		if (!m_entities->has_component<Position>(axon.parent)) return;
+		auto& parent_pos = m_entities->get_component<Position>(axon.parent);
+		glm::vec4 color = NeuronColors[axon.type];
+		m_lines.push_back({glm::vec3(parent_pos.x, parent_pos.y, parent_pos.z), color});
+		m_lines.push_back({glm::vec3(pos.x, pos.y, pos.z), color});
 	}
+
+private:
+
+	std::vector<Point> &m_lines;   // A reference to the vector where to store the axon lines.
+	Entities *m_entities{nullptr}; // A pointer to the entities to get extra data during process.
+
 };
 
 
 
+/**
+ * @class DendriteRenderSystem
+ * @brief System used to render the dendrites.
+ */
 class DendriteRenderSystem : public System<DendriteRenderSystem, Dendrite, Position>
 {
 public:
-	std::vector<Point>& render_lines;
-	Entities* entities_ptr;
 
-	DendriteRenderSystem(Entities& ents, std::vector<Point>& lines) : render_lines(lines), entities_ptr(&ents) {}
+	/**
+	 * @brief Construct a dendrite render system linked to a given vector.
+	 * @param entities The entities to use in process in order to get extra data.
+	 * @param lines The vector where to store the generated data.
+	 */
+	DendriteRenderSystem(Entities &entities, std::vector<Point> &lines) : 
+		m_lines(lines), m_entities(&entities) 
+	{}
 
-	void update(Entities& entities, float dt) override
+	/**
+	 * @brief Update function to call in order to generate all lines.
+	 * @param entities The entities to render.
+	 * @param dt Unused.
+	 */
+	void update(Entities &entities, float dt) override
 	{
-		render_lines.clear();
 		System<DendriteRenderSystem, Dendrite, Position>::update(entities, dt);
 	}
 
-	void process([[maybe_unused]] Entity entity, Dendrite& dendrite, Position& pos, [[maybe_unused]] float dt)
+	/**
+	 * @brief Process one entity to generate its line.
+	 * @param entity Unused.
+	 * @param dendrite The entity dendrite.
+	 * @param pos The entity position in space.
+	 * @param dt Unused.
+	 */
+	void process([[maybe_unused]] Entity entity, Dendrite &dendrite, Position &pos, [[maybe_unused]] float dt)
 	{
-		if (!entities_ptr->has_component<Position>(dendrite.parent)) return;
-
-		auto& parent_pos = entities_ptr->get_component<Position>(dendrite.parent);
+		if (!m_entities->has_component<Position>(dendrite.parent)) return;
+		auto &parent_pos = m_entities->get_component<Position>(dendrite.parent);
 		glm::vec4 color = NeuronColors[dendrite.type]; 
-
-		render_lines.push_back({glm::vec3(parent_pos.x, parent_pos.y, parent_pos.z), color});
-		render_lines.push_back({glm::vec3(pos.x, pos.y, pos.z), color});
+		m_lines.push_back({glm::vec3(parent_pos.x, parent_pos.y, parent_pos.z), color});
+		m_lines.push_back({glm::vec3(pos.x, pos.y, pos.z), color});
 	}
+
+private:
+
+	std::vector<Point> &m_lines;   // A reference to the vector where to store the dendrite lines.
+	Entities* m_entities{nullptr}; // A pointer to the entities to get extra data during process.	
+
 };
 
 
+
+/**
+ * @class SynapseRenderSystem
+ * @brief System used to render the synapses.
+ */
 class SynapseRenderSystem : public System<SynapseRenderSystem, Synapse>
 {
 public:
-	Entities* entities_ptr;
-	std::vector<Point>& render_synapse;
-	bool use_gradient; // Paramètre de contrôle du mode d'affichage
 
-	SynapseRenderSystem(Entities& ents, std::vector<Point>& lines, bool gradient = false) : entities_ptr(&ents), render_synapse(lines), use_gradient(gradient) {}
+	/**
+	 * @brief Construct a synapse render system linked to a given vector.
+	 * @param entities The entities to use in process in order to get extra data.
+	 * @param lines The vector where to store the generated data.
+	 */
+	SynapseRenderSystem(Entities &entities, std::vector<Point> &lines, bool gradient = false) : 
+		m_lines(lines), m_entities(&entities), use_gradient(gradient) 
+	{}
 
-	void update(Entities& entities, float dt) override
+	/**
+	 * @brief Update function to call in order to generate all lines.
+	 * @param entities The entities to render.
+	 * @param dt Unused.
+	 */
+	void update(Entities &entities, float dt) override
 	{
-		render_synapse.clear();
 		System<SynapseRenderSystem, Synapse>::update(entities, dt);
 	}
 
-	void process([[maybe_unused]] Entity entity, Synapse& synapse, [[maybe_unused]] float dt)
+	/**
+	 * @brief Process one entity to generate its line.
+	 * @param entity Unused.
+	 * @param synapse The entity synapse.
+	 * @param pos The entity position in space.
+	 * @param dt Unused.
+	 */
+	void process([[maybe_unused]] Entity entity, Synapse &synapse, [[maybe_unused]] float dt)
 	{
-		if (!entities_ptr->has_component<Position>(synapse.parent) || !entities_ptr->has_component<Position>(synapse.child)) return;
+		if (!m_entities->has_component<Position>(synapse.parent) || !m_entities->has_component<Position>(synapse.child)) return;
 
-		auto& source_pos = entities_ptr->get_component<Position>(synapse.parent);
-		auto& target_pos = entities_ptr->get_component<Position>(synapse.child);
-		
+		// Get the source and target position.
+		const Position source_pos = m_entities->get_component<Position>(synapse.parent);
+		const Position target_pos = m_entities->get_component<Position>(synapse.child);
 		glm::vec4 color_source = glm::vec4(1.0f); 
 		glm::vec4 color_target = glm::vec4(1.0f);
 
+		// In gradient mode, get the synapse color depending of the somas colors and the nature of the connection.
 		if (use_gradient) {
-			// Détermination de la couleur de départ
-			if (entities_ptr->has_component<Axon>(synapse.parent)) color_source = NeuronColors[entities_ptr->get_component<Axon>(synapse.parent).type];
-			else if (entities_ptr->has_component<Soma>(synapse.parent)) color_source = NeuronColors[entities_ptr->get_component<Soma>(synapse.parent).type];
-
-			// Détermination de la couleur d'arrivée en fonction du type d'enfant
-			if (synapse.child_dendrite && entities_ptr->has_component<Dendrite>(synapse.child)) color_target = NeuronColors[entities_ptr->get_component<Dendrite>(synapse.child).type];
-			else if (synapse.child_soma && entities_ptr->has_component<Soma>(synapse.child)) color_target = NeuronColors[entities_ptr->get_component<Soma>(synapse.child).type];
-			else if (synapse.child_axon && entities_ptr->has_component<Axon>(synapse.child)) color_target = NeuronColors[entities_ptr->get_component<Axon>(synapse.child).type];
+			if (m_entities->has_component<Axon>(synapse.parent)) color_source = NeuronColors[m_entities->get_component<Axon>(synapse.parent).type];
+			else if (m_entities->has_component<Soma>(synapse.parent)) color_source = NeuronColors[m_entities->get_component<Soma>(synapse.parent).type];
+			if (synapse.child_dendrite && m_entities->has_component<Dendrite>(synapse.child)) color_target = NeuronColors[m_entities->get_component<Dendrite>(synapse.child).type];
+			else if (synapse.child_soma && m_entities->has_component<Soma>(synapse.child)) color_target = NeuronColors[m_entities->get_component<Soma>(synapse.child).type];
+			else if (synapse.child_axon && m_entities->has_component<Axon>(synapse.child)) color_target = NeuronColors[m_entities->get_component<Axon>(synapse.child).type];
+		
+		// Else we do a colorization depending of the weight.
 		} else {
-			// Coloration par poids
 			if (synapse.weight < 0.0f) color_source = color_target = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f);
 			else if (synapse.weight > 0.0f) color_source = color_target = glm::vec4(0.0f, 1.0f, 0.0f, 1.0f);
 		}
 
-		// OpenGL interpolera automatiquement le gradient entre ces deux sommets de la ligne
-		render_synapse.push_back({glm::vec3(source_pos.x, source_pos.y, source_pos.z), color_source});
-		render_synapse.push_back({glm::vec3(target_pos.x, target_pos.y, target_pos.z), color_target});
+		// Add the data.
+		m_lines.push_back({glm::vec3(source_pos.x, source_pos.y, source_pos.z), color_source});
+		m_lines.push_back({glm::vec3(target_pos.x, target_pos.y, target_pos.z), color_target});
+
 	}
+
+private:
+
+	std::vector<Point> &m_lines;   // A reference to the vector where to store the synapse lines.
+	Entities *m_entities{nullptr}; // A pointer to the entities to get extra data during process.
+	bool use_gradient{false};      // Control of the rendering mode.
+
 };
